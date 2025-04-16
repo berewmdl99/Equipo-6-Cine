@@ -1,13 +1,24 @@
+import React from 'react';
 import { useThemeStore } from "../store/themeStore";
-import { Sun, Moon } from "lucide-react";
+import { IconButton, Tooltip, useTheme } from "@mui/material";
+import Brightness4Icon from '@mui/icons-material/Brightness4';
+import Brightness7Icon from '@mui/icons-material/Brightness7';
 
 const DarkModeToggle = () => {
   const { theme, toggleTheme } = useThemeStore();
+  const muiTheme = useTheme();
+  const isDarkMode = theme === "dark";
 
   return (
-    <button onClick={toggleTheme} className="p-2 rounded bg-gray-200 dark:bg-gray-800">
-      {theme === "light" ? <Moon size={24} /> : <Sun size={24} />}
-    </button>
+    <Tooltip title={isDarkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}>
+      <IconButton 
+        onClick={toggleTheme} 
+        color="inherit"
+        aria-label={isDarkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+      >
+        {isDarkMode ? <Brightness7Icon /> : <Brightness4Icon />}
+      </IconButton>
+    </Tooltip>
   );
 };
 

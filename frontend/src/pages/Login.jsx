@@ -1,32 +1,31 @@
 // src/pages/Login.jsx
 
 import React, { useState } from "react";
-import { TextField, Button, Typography, Box } from "@mui/material";
+import { TextField, Button, Typography, Box, Alert } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { login } from "../services/authService";
-import { useAuthStore } from "../store/authStore";
+import { useAuth } from "../context/AuthContext";
 
 const Login = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const loginUser = useAuthStore((state) => state.login);
+  const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setLoading(true);
+    
     try {
-      const userData = await login(username, password);
-      if (userData.access_token) {
-        loginUser(userData, userData.access_token);
-        navigate("/"); // Redirige al Dashboard
-      } else {
-        setError("Error: No se recibió el token");
-      }
+      await login(username, password);
+      navigate("/");
     } catch (err) {
-      console.error("Error de autenticación:", err);
-      setError("Credenciales incorrectas");
+      console.error("Error de login:", err);
+      setError(err.message || "Error al iniciar sesión");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -40,11 +39,17 @@ const Login = () => {
         backgroundColor: "#f0f0f0",
       }}
     >
-      <Box sx={{ padding: 4, backgroundColor: "white", borderRadius: 2 }}>
-        <Typography variant="h5" gutterBottom>
+      <Box sx={{ padding: 4, backgroundColor: "white", borderRadius: 2, width: "100%", maxWidth: 400 }}>
+        <Typography variant="h5" gutterBottom align="center">
           Iniciar Sesión
         </Typography>
-        {error && <Typography color="error">{error}</Typography>}
+        
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        
         <form onSubmit={handleSubmit}>
           <TextField
             label="Usuario"
@@ -53,6 +58,7 @@ const Login = () => {
             onChange={(e) => setUsername(e.target.value)}
             sx={{ marginBottom: 2 }}
             required
+            disabled={loading}
           />
           <TextField
             label="Contraseña"
@@ -62,9 +68,16 @@ const Login = () => {
             onChange={(e) => setPassword(e.target.value)}
             sx={{ marginBottom: 2 }}
             required
+            disabled={loading}
           />
-          <Button type="submit" variant="contained" color="primary" fullWidth>
-            Iniciar Sesión
+          <Button 
+            type="submit" 
+            variant="contained" 
+            color="primary" 
+            fullWidth
+            disabled={loading}
+          >
+            {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
           </Button>
         </form>
       </Box>

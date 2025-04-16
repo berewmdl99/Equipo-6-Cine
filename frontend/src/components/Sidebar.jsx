@@ -1,51 +1,54 @@
 // src/components/Sidebar.jsx
 
 import React from "react";
-import { Drawer, List, ListItem, ListItemText } from "@mui/material";
-import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "../store/authStore";
+import { Drawer, List, ListItem, ListItemText, ListItemIcon } from "@mui/material";
+import { Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const Sidebar = () => {
-  const navigate = useNavigate();
-  const { user } = useAuthStore(state => state);
+  const { isAdmin } = useAuth();
 
-  const handleNavigation = (path) => {
-    navigate(path);
-  };
-
-  const adminRoutes = [
-    { text: "Gestión de Usuarios", path: "/admin/gestion-usuarios" },
-    { text: "Gestión de Películas", path: "/admin/gestion-peliculas" },
-    { text: "Gestión de Funciones", path: "/admin/gestion-funciones" },
-    { text: "Gestión de Salas", path: "/admin/gestion-salas" },
-    { text: "Reportes de Ventas", path: "/admin/reportes" },
-  ];
-
+  // Rutas generales (para todos los usuarios)
   const generalRoutes = [
     { text: "Dashboard", path: "/" },
     { text: "Películas", path: "/peliculas" },
-    { text: "Funciones", path: "/funciones" },
     { text: "Boletos", path: "/boletos" },
+    { text: "Funciones", path: "/funciones" },
+    { text: "Reimprimir Boletos", path: "/impresion-boletos" }
   ];
 
-  const routes = user?.isAdmin ? adminRoutes : generalRoutes;
+  // Rutas adicionales solo para administradores
+  const adminRoutes = [
+    { text: "Dashboard Admin", path: "/admin" },
+    { text: "Gestión de Usuarios", path: "/admin/usuarios" },
+    { text: "Gestión de Películas", path: "/admin/peliculas" },
+    { text: "Gestión de Salas", path: "/admin/salas" },
+    { text: "Gestión de Funciones", path: "/admin/funciones" },
+    { text: "Reportes de Ventas", path: "/admin/reportes" }
+  ];
+
+  const routes = isAdmin ? [...generalRoutes, ...adminRoutes] : generalRoutes;
 
   return (
     <Drawer
+      variant="permanent"
       sx={{
         width: 240,
         flexShrink: 0,
-        "& .MuiDrawer-paper": {
+        '& .MuiDrawer-paper': {
           width: 240,
-          boxSizing: "border-box",
+          boxSizing: 'border-box',
         },
       }}
-      variant="permanent"
-      anchor="left"
     >
       <List>
-        {routes.map((route, index) => (
-          <ListItem button key={index} onClick={() => handleNavigation(route.path)}>
+        {routes.map((route) => (
+          <ListItem
+            button
+            component={Link}
+            to={route.path}
+            key={route.path}
+          >
             <ListItemText primary={route.text} />
           </ListItem>
         ))}

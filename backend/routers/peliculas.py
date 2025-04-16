@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app.models import Pelicula, Funcion
 from app.schemas import PeliculaCreate, PeliculaUpdate, PeliculaResponse
 from app.auth import get_current_user
+from app.utils.image_handler import guardar_imagen  # Importar la función
 import shutil
 import os
+from typing import Optional
 
 router = APIRouter(prefix="/peliculas", tags=["Películas"])
 
@@ -16,8 +18,68 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)  # Crear la carpeta si no existe
 
 @router.get("/", response_model=list[PeliculaResponse])
 def listar_peliculas(db: Session = Depends(get_db)):
-    """Lista todas las películas disponibles."""
-    return db.query(Pelicula).all()
+    """Lista todas las películas disponibles en cartelera."""
+    try:
+        peliculas = db.query(Pelicula).options(
+            joinedload(Pelicula.funciones)
+        ).filter(Pelicula.en_cartelera == True).all()
+        
+        # Convertir los objetos SQLAlchemy a diccionarios
+        peliculas_dict = []
+        for pelicula in peliculas:
+            pelicula_dict = {
+                "id": pelicula.id,
+                "titulo": pelicula.titulo,
+                "duracion_min": pelicula.duracion_min,
+                "clasificacion": pelicula.clasificacion,
+                "genero": pelicula.genero,
+                "descripcion": pelicula.descripcion,
+                "en_cartelera": pelicula.en_cartelera,
+                "imagen_url": pelicula.imagen_url,
+                "funciones": [{"id": f.id} for f in pelicula.funciones]
+            }
+            peliculas_dict.append(pelicula_dict)
+            
+        return peliculas_dict
+    except Exception as e:
+        print(f"Error al listar películas: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al listar las películas: {str(e)}"
+        )
+
+
+@router.get("/todas", response_model=list[PeliculaResponse])
+def listar_todas_peliculas(db: Session = Depends(get_db)):
+    """Lista todas las películas sin filtrar por en_cartelera."""
+    try:
+        peliculas = db.query(Pelicula).options(
+            joinedload(Pelicula.funciones)
+        ).all()
+        
+        # Convertir los objetos SQLAlchemy a diccionarios
+        peliculas_dict = []
+        for pelicula in peliculas:
+            pelicula_dict = {
+                "id": pelicula.id,
+                "titulo": pelicula.titulo,
+                "duracion_min": pelicula.duracion_min,
+                "clasificacion": pelicula.clasificacion,
+                "genero": pelicula.genero,
+                "descripcion": pelicula.descripcion,
+                "en_cartelera": pelicula.en_cartelera,
+                "imagen_url": pelicula.imagen_url,
+                "funciones": [{"id": f.id} for f in pelicula.funciones]
+            }
+            peliculas_dict.append(pelicula_dict)
+            
+        return peliculas_dict
+    except Exception as e:
+        print(f"Error al listar todas las películas: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al listar todas las películas: {str(e)}"
+        )
 
 
 @router.post("/", response_model=PeliculaResponse, status_code=status.HTTP_201_CREATED)
@@ -26,8 +88,8 @@ async def crear_pelicula(
     duracion_min: int = Form(...),
     clasificacion: str = Form(...),
     genero: str = Form(...),
-    descripcion: str = Form(None),
-    imagen: UploadFile = File(None),  # Imagen opcional
+    descripcion: Optional[str] = Form(None),
+    imagen: Optional[UploadFile] = File(None),
     en_cartelera: bool = Form(True),
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -35,39 +97,28 @@ async def crear_pelicula(
     """Crea una nueva película (solo administradores pueden hacerlo)."""
     if not current_user.is_admin:
         raise HTTPException(
-            status_code=403, detail="Solo administradores pueden crear películas."
+            status_code=403, 
+            detail="Solo administradores pueden crear películas."
         )
 
-    # Manejar la imagen si se proporciona
-    file_location = None
-    if imagen:
-        # Verificar si la imagen es de tipo JPG o PNG
-        image_extension = imagen.filename.split(".")[-1].lower()
-        if image_extension not in ["jpg", "jpeg", "png"]:
-            raise HTTPException(
-                status_code=400, detail="El archivo debe ser una imagen PNG o JPG."
-            )
+    try:
+        imagen_url = await guardar_imagen(imagen) if imagen else None
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-        # Guardar la imagen si está presente
-        file_location = f"{UPLOAD_DIR}{titulo.replace(' ', '_')}_imagen.{image_extension}"
-        with open(file_location, "wb") as f:
-            shutil.copyfileobj(imagen.file, f)
-
-    # Crear nueva película
     nueva_pelicula = Pelicula(
         titulo=titulo,
         duracion_min=duracion_min,
         clasificacion=clasificacion,
         genero=genero,
         descripcion=descripcion,
-        imagen_url=file_location,  # Puede ser None si no se subió imagen
+        imagen_url=imagen_url,
         en_cartelera=en_cartelera,
     )
 
     db.add(nueva_pelicula)
     db.commit()
     db.refresh(nueva_pelicula)
-
     return nueva_pelicula
 
 

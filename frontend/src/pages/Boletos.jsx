@@ -1,29 +1,33 @@
 // /pages/Boletos.jsx
 import React, { useState, useEffect } from "react";
-import { TextField, Button, MenuItem, Select, InputLabel, FormControl } from "@mui/material";
+import { TextField, Button, MenuItem, Select, InputLabel, FormControl, Box, Typography } from "@mui/material";
 import boletoService from "../services/boletoService";
 import funcionService from "../services/funcionService";
 import * as asientoService from '../services/asientoService';
-import * as usuarioService from "../services/usuarioService";
+import { getUsers } from '/src/services/auth';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import BackToMenuButton from '../components/BackToMenuButton';
 
 const Boletos = () => {
+  const { funcionId } = useParams();
+  const { user } = useAuth();
   const [boletos, setBoletos] = useState([]);
   const [funciones, setFunciones] = useState([]);
   const [asientos, setAsientos] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
-  const [nuevoBoleto, setNuevoBoleto] = useState({
-    funcion_id: "",
-    asiento_id: "",
-    usuario_id: "",
-    precio: "",
-    estado: "Activo",
+  const [formData, setFormData] = useState({
+    funcion_id: funcionId,
+    asientos: [],
+    precio_total: 0,
+    usuario_id: user.id
   });
 
   useEffect(() => {
     const fetchData = async () => {
       const funcionesData = await funcionService.obtenerFunciones();
       const asientosData = await asientoService.obtenerAsientos();
-      const usuariosData = await usuarioService.obtenerUsuarios();
+      const usuariosData = await getUsers();
       setFunciones(funcionesData);
       setAsientos(asientosData);
       setUsuarios(usuariosData);
@@ -39,29 +43,53 @@ const Boletos = () => {
   };
 
   const handleInputChange = (e) => {
-    setNuevoBoleto({ ...nuevoBoleto, [e.target.name]: e.target.value });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await boletoService.crearBoleto(nuevoBoleto);
-      setNuevoBoleto({ funcion_id: "", asiento_id: "", usuario_id: "", precio: "", estado: "Activo" });
-      obtenerBoletos(); // Recargar los boletos después de crear uno nuevo
+      // Primero reservamos los asientos
+      await asientoService.reservarAsientos(
+        formData.asientos.map(a => a.id)
+      );
+
+      // Creamos los boletos
+      const boletos = await Promise.all(
+        formData.asientos.map(asiento => 
+          boletoService.crearBoleto({
+            funcion_id: parseInt(funcionId),
+            asiento_id: asiento.id,
+            usuario_id: user.id,
+            precio: formData.precio_por_asiento,
+            estado: 'vendido'
+          })
+        )
+      );
+
+      return boletos;
     } catch (error) {
-      console.error("Error al crear boleto:", error);
+      // Si algo falla, liberamos los asientos
+      await asientoService.liberarAsientos(
+        formData.asientos.map(a => a.id)
+      );
+      throw error;
     }
   };
 
   return (
-    <div>
-      <h2>Gestionar Boletos</h2>
+    <Box sx={{ p: 3 }}>
+      <BackToMenuButton />
+      <Typography variant="h4" gutterBottom>
+        Venta de Boletos
+      </Typography>
+      
       <form onSubmit={handleSubmit}>
         <FormControl fullWidth>
           <InputLabel>Función</InputLabel>
           <Select
             name="funcion_id"
-            value={nuevoBoleto.funcion_id}
+            value={formData.funcion_id}
             onChange={handleInputChange}
             required
           >
@@ -76,10 +104,11 @@ const Boletos = () => {
         <FormControl fullWidth>
           <InputLabel>Asiento</InputLabel>
           <Select
-            name="asiento_id"
-            value={nuevoBoleto.asiento_id}
+            name="asientos"
+            value={formData.asientos.map(a => a.id)}
             onChange={handleInputChange}
             required
+            multiple
           >
             {asientos.map((asiento) => (
               <MenuItem key={asiento.id} value={asiento.id}>
@@ -93,7 +122,7 @@ const Boletos = () => {
           <InputLabel>Usuario</InputLabel>
           <Select
             name="usuario_id"
-            value={nuevoBoleto.usuario_id}
+            value={formData.usuario_id}
             onChange={handleInputChange}
             required
           >
@@ -106,17 +135,17 @@ const Boletos = () => {
         </FormControl>
 
         <TextField
-          name="precio"
-          label="Precio"
+          name="precio_total"
+          label="Precio Total"
           type="number"
-          value={nuevoBoleto.precio}
+          value={formData.precio_total}
           onChange={handleInputChange}
           fullWidth
           required
         />
 
         <Button type="submit" variant="contained" color="primary">
-          Crear Boleto
+          Crear Boletos
         </Button>
       </form>
 
@@ -128,7 +157,7 @@ const Boletos = () => {
           </li>
         ))}
       </ul>
-    </div>
+    </Box>
   );
 };
 

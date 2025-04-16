@@ -7,14 +7,23 @@ from passlib.context import CryptContext
 from app.database import get_db
 from app.models import Usuario
 from sqlalchemy.orm import Session
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Clave secreta para JWT
-SECRET_KEY = "tu_clave_secreta_super_segura"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+SECRET_KEY = os.getenv("SECRET_KEY", "tu_clave_secreta_super_segura")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
-# Manejo de contraseñas
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Manejo de contraseñas - Configuración actualizada para evitar el error de bcrypt
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=12,
+    bcrypt__ident="2b"
+)
 
 # OAuth2 para autenticación
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="usuarios/login")
@@ -36,32 +45,38 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoded_jwt
 
 def authenticate_user(db: Session, username: str, password: str):
-    user = db.query(Usuario).filter(Usuario.nombre == username).first()
+    user = db.query(Usuario).filter(Usuario.username == username).first()
     if not user or not verify_password(password, user.hashed_password):
         return None
     return user
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    print("🔹 Validando token con:", SECRET_KEY, ALGORITHM)  # 👈 Agregado
-    print("🔹 Token recibido:", token)  # 👈 Agregado
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        print("🔹 Payload decodificado:", payload)  # 👈 Agregado
-        user_id = payload.get("sub")
+        user_id: str = payload.get("sub")
         if user_id is None:
-            raise HTTPException(status_code=401, detail="Token inválido")
-
-        # 🔹 Aquí agregamos la validación 🔹
+            raise credentials_exception
         try:
             user_id = int(user_id)
         except ValueError:
-            raise HTTPException(status_code=400, detail="ID de usuario inválido")
-
-        user = db.query(Usuario).filter(Usuario.id == user_id).first()
-        
-        if user is None:
-            raise HTTPException(status_code=404, detail="Usuario no encontrado")
-        
-        return user
+            raise credentials_exception
     except JWTError:
-        raise HTTPException(status_code=401, detail="No se pudo validar el token")
+        raise credentials_exception
+        
+    user = db.query(Usuario).filter(Usuario.id == user_id).first()
+    if user is None:
+        raise credentials_exception
+    return user
+
+def verificar_admin(current_user: Usuario = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos de administrador"
+        )
+    return current_user

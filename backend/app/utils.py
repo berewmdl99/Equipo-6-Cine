@@ -1,7 +1,12 @@
 from passlib.context import CryptContext
 
-# Inicializamos el contexto de hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Inicializamos el contexto de hashing con la misma configuración que en auth.py
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=12,
+    bcrypt__ident="2b"
+)
 
 def hash_password(password: str) -> str:
     """Devuelve la contraseña encriptada usando bcrypt."""

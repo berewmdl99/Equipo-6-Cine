@@ -1,15 +1,14 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Home, Film, Calendar, Ticket, LogOut, Settings } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const Navbar = () => {
   const navigate = useNavigate();
-  const isAuthenticated = localStorage.getItem('access_token');
-  const isAdmin = JSON.parse(localStorage.getItem('user_role')) === 'admin'; // Suponiendo que guardes el rol del usuario
+  const { isAuthenticated, isAdmin, logout } = useAuth();
 
   const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('user_role'); // Eliminar rol también
+    logout();
     navigate('/login');
   };
 

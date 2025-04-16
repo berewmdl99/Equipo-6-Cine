@@ -1,10 +1,10 @@
 import React from "react";
 import { Route, Routes } from "react-router-dom";
-import LoginForm from "../components/LoginForm";
+import Login from "../pages/Login";
 
 const AuthRoutes = () => (
   <Routes>
-    <Route path="/" element={<LoginForm />} />
+    <Route path="/" element={<Login />} />
   </Routes>
 );
 

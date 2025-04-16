@@ -1,30 +1,61 @@
 // src/services/salaService.js
-import api from "../utils/api";
+import api from '../utils/api';
 
-const obtenerSalas = async () => {
-  const response = await api.get("/salas/");
-  return response.data;
+const handleError = (error, operation) => {
+  console.error(`Error al ${operation}:`, error);
+  throw new Error(error.response?.data?.detail || `Error al ${operation}`);
 };
 
-const crearSala = async (datos) => {
-  const response = await api.post("/salas/", datos);
-  return response.data;
-};
+export async function obtenerSalas() {
+  try {
+    const response = await api.get('/salas');
+    return response.data;
+  } catch (error) {
+    handleError(error, 'obtener salas');
+  }
+}
 
-const actualizarSala = async (id, datos) => {
-  const response = await api.put(`/salas/${id}`, datos);
-  return response.data;
-};
+export async function obtenerSala(id) {
+  try {
+    if (!id) {
+      throw new Error('El ID de la sala es requerido');
+    }
+    const response = await api.get(`/salas/${id}`);
+    return response.data;
+  } catch (error) {
+    handleError(error, 'obtener sala');
+  }
+}
 
-const eliminarSala = async (id) => {
-  await api.delete(`/salas/${id}`);
-};
+export async function crearSala(salaData) {
+  try {
+    const response = await api.post('/salas', salaData);
+    return response.data;
+  } catch (error) {
+    handleError(error, 'crear sala');
+  }
+}
 
-const salaService = {
-  obtenerSalas,
-  crearSala,
-  actualizarSala,
-  eliminarSala,
-};
+export async function actualizarSala(id, salaData) {
+  try {
+    if (!id) {
+      throw new Error('El ID de la sala es requerido');
+    }
+    const response = await api.put(`/salas/${id}`, salaData);
+    return response.data;
+  } catch (error) {
+    handleError(error, 'actualizar sala');
+  }
+}
 
-export default salaService;
+export async function eliminarSala(id) {
+  try {
+    if (!id) {
+      throw new Error('El ID de la sala es requerido');
+    }
+    const response = await api.delete(`/salas/${id}`);
+    return response.data;
+  } catch (error) {
+    handleError(error, 'eliminar sala');
+  }
+}
